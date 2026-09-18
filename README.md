@@ -27,6 +27,14 @@ cp -r skills/claude-tasks ~/.claude/skills/claude-tasks
 ln -s "$(pwd)/skills/claude-tasks" ~/.claude/skills/claude-tasks
 ```
 
+**Note the installed path of any script**: scripts live under
+`scripts/` inside a skill's folder here, so a skill installed this way
+ends up at `~/.claude/skills/<skill>/scripts/<script>.py`, not directly
+at `~/.claude/skills/<skill>/<script>.py`. If you point a shortcut,
+terminal profile, or alias at a skill's script directly, update it to
+the `scripts/` path — and update it again if you re-install after this
+layout changes.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the conventions each skill in this
