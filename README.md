@@ -1,4 +1,4 @@
-# my-skills
+# skills
 
 Personal collection of [Claude Code](https://claude.com/claude-code) skills,
 kept in one place so they can be versioned, reused across machines, and shared.
@@ -27,7 +27,7 @@ itself as both the marketplace and the one plugin it offers
 Claude Code session:
 
 ```
-/plugin marketplace add alvesmaia/my-skills
+/plugin marketplace add alvesmaia/skills
 /plugin install alvesmaia@alvesmaia-skills
 ```
 
