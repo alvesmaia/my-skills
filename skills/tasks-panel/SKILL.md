@@ -1,5 +1,5 @@
 ---
-name: claude-tasks
+name: tasks-panel
 description: Use when executing a multi-task implementation plan and the user has no visibility into progress. Also use when the user asks to open the task board, open the progress panel, or see where the plan stands.
 ---
 
@@ -19,14 +19,14 @@ This skill solves that with two artifacts: a file **you** maintain, and a panel
 in the format below, then open the panel:
 
 ```
-uv run <this-skill-dir>/scripts/claude-tasks.py
+uv run <this-skill-dir>/scripts/tasks-panel.py
 ```
 
 On Windows with Windows Terminal available, open it in a split pane instead so
 it doesn't take over the current one:
 
 ```
-wt -w 0 split-pane -V -s 0.3 uv.exe run <this-skill-dir>/scripts/claude-tasks.py
+wt -w 0 split-pane -V -s 0.3 uv.exe run <this-skill-dir>/scripts/tasks-panel.py
 ```
 
 Tell the user in one line that the panel is open and that phases expand on
@@ -118,7 +118,7 @@ At rest it only compares the file's modification time.
 
 ## Themes
 
-`uv run <this-skill-dir>/scripts/claude-tasks.py --theme NAME [path]`
+`uv run <this-skill-dir>/scripts/tasks-panel.py --theme NAME [path]`
 
 - `alvesmaia` (default) — the alvesmaia brand palette (indigo accent, neutro
   text), terminal's own background.

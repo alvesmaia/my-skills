@@ -15,7 +15,7 @@ its folder there.
 
 | Skill | What it's for |
 |---|---|
-| [`claude-tasks`](skills/claude-tasks/) | A clickable progress panel for a multi-task plan tracked in `TASKS.md`, so the user can see status without asking. |
+| [`tasks-panel`](skills/tasks-panel/) | A clickable progress panel for a multi-task plan tracked in `TASKS.md`, so the user can see status without asking. |
 
 ## Installing
 
@@ -39,9 +39,9 @@ plugin system — no manual copying, no path to keep in sync by hand.
 Copy (or symlink) the skill's directory into your skills folder:
 
 ```bash
-cp -r skills/claude-tasks ~/.claude/skills/claude-tasks
+cp -r skills/tasks-panel ~/.claude/skills/tasks-panel
 # or, to keep it in sync with this repo:
-ln -s "$(pwd)/skills/claude-tasks" ~/.claude/skills/claude-tasks
+ln -s "$(pwd)/skills/tasks-panel" ~/.claude/skills/tasks-panel
 ```
 
 **Note the installed path of any script**: scripts live under

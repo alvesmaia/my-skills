@@ -15,7 +15,7 @@ whatever the reader had expanded or collapsed.
 Run it (dependencies live in the PEP 723 header above; uv resolves them into its
 own cache, nothing is installed system-wide):
 
-    uv run claude-tasks.py [--theme NAME] [path/to/TASKS.md]
+    uv run tasks-panel.py [--theme NAME] [path/to/TASKS.md]
 
 Themes: alvesmaia (default), dourado, monokai, vscode-dark.
 
@@ -231,7 +231,7 @@ def find_board(argv: list[str]) -> Path:
 
     raise SystemExit(
         f"no {BOARD_NAMES[0]} in the current directory or any parent.\n"
-        f"Pass one: claude-tasks.py <path-to-board>"
+        f"Pass one: tasks-panel.py <path-to-board>"
     )
 
 
