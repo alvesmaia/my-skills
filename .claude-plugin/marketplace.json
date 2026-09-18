@@ -1,0 +1,18 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "alvesmaia-skills",
+  "description": "Marketplace for alvesmaia's personal Claude Code skills",
+  "owner": {
+    "name": "Uemerson Maia"
+  },
+  "plugins": [
+    {
+      "name": "my-skills",
+      "description": "Personal collection of Claude Code skills",
+      "author": {
+        "name": "Uemerson Maia"
+      },
+      "source": "./"
+    }
+  ]
+}

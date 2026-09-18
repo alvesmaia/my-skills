@@ -17,7 +17,24 @@ its folder there.
 |---|---|
 | [`claude-tasks`](skills/claude-tasks/) | A clickable progress panel for a multi-task plan tracked in `TASKS.md`, so the user can see status without asking. |
 
-## Installing a skill
+## Installing
+
+### As a plugin (recommended)
+
+This repo is also a self-hosted Claude Code plugin marketplace: it declares
+itself as both the marketplace and the one plugin it offers
+(`.claude-plugin/marketplace.json` and `.claude-plugin/plugin.json`). From any
+Claude Code session:
+
+```
+/plugin marketplace add alvesmaia/my-skills
+/plugin install my-skills@alvesmaia-skills
+```
+
+This installs every skill in `skills/` and keeps them updatable through the
+plugin system — no manual copying, no path to keep in sync by hand.
+
+### Manually, one skill at a time
 
 Copy (or symlink) the skill's directory into your skills folder:
 
