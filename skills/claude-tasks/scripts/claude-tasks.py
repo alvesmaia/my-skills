@@ -15,7 +15,9 @@ whatever the reader had expanded or collapsed.
 Run it (dependencies live in the PEP 723 header above; uv resolves them into its
 own cache, nothing is installed system-wide):
 
-    uv run claude-tasks.py [path/to/TASKS.md]
+    uv run claude-tasks.py [--theme NAME] [path/to/TASKS.md]
+
+Themes: alvesmaia (default), dourado, monokai, vscode-dark.
 
 Keys: up/down move · right opens · left closes · Enter toggles · a expands all ·
 c collapses all · r reloads · q quits
@@ -78,30 +80,133 @@ CSS_CLASS = {
     "❓": "decide",
 }
 
-# A bright band, this many characters wide, sweeps left-to-right over a
-# running item's text and loops. SHIMMER_COLORS goes dim -> bright -> dim so
-# the band has a soft edge instead of a hard cutoff.
-SHIMMER_COLORS = ("#c9812f", "#e6a24a", "#f7c873", "#fff3d6", "#f7c873", "#e6a24a", "#c9812f")
-SHIMMER_BASE = "#c9812f"
-SHIMMER_WIDTH = len(SHIMMER_COLORS)
+@dataclass(frozen=True)
+class ThemeColors:
+    """Every color the board uses. One theme = one instance of this."""
+
+    title: str
+    summary: str
+    text: str  # CollapsibleTitle / default item text
+    done: str
+    todo: str
+    blocked: str
+    decide: str
+    detail: str
+    focus_bg: str
+    focus_fg: str
+    shimmer_edge: str  # where the running band fades into SHIMMER_BASE
+    shimmer_mid: str
+    shimmer_peak: str  # brightest point, center of the band
+    background: str | None = None  # None keeps Textual's own $surface
+    running: str = "#FFFFFF"  # conventional white, same in every theme
+    shimmer_base: str = "#FFFFFF"  # must match `running`: shimmer markup
+    # always overrides the CSS color, so this is what "not shimmering" shows.
+
+
+# Every color below is traceable to a real source, not picked freehand:
+# alvesmaia from branding/brand/paleta.json, monokai and vscode-dark from
+# those editors' actual default palettes.
+THEMES: dict[str, ThemeColors] = {
+    "alvesmaia": ThemeColors(
+        title="#4F6BFF", summary="#5A7189", text="#EAF1F7", done="#5A7189",
+        todo="#6C8298", blocked="#B02E21", decide="#96600B", detail="#5A7189",
+        focus_bg="#3A5163", focus_fg="#F6F9FC",
+        shimmer_edge="#B9C8D6", shimmer_mid="#4F6BFF", shimmer_peak="#EEF1FF",
+    ),
+    "dourado": ThemeColors(
+        title="#F7C873", summary="#C9812F", text="#FFF3D6", done="#8F7A4E",
+        todo="#9C8F74", blocked="#B02E21", decide="#96600B", detail="#C9812F",
+        focus_bg="#3A5163", focus_fg="#F6F9FC",
+        shimmer_edge="#C9812F", shimmer_mid="#F7C873", shimmer_peak="#FFF3D6",
+    ),
+    "monokai": ThemeColors(
+        background="#272822",
+        title="#A6E22E", summary="#75715E", text="#F8F8F2", done="#75715E",
+        todo="#9E9B8A", blocked="#F92672", decide="#E6DB74", detail="#75715E",
+        focus_bg="#49483E", focus_fg="#F8F8F2",
+        shimmer_edge="#75715E", shimmer_mid="#66D9EF", shimmer_peak="#F8F8F2",
+    ),
+    "vscode-dark": ThemeColors(
+        background="#1E1E1E",
+        title="#569CD6", summary="#6A9955", text="#D4D4D4", done="#6A9955",
+        todo="#808080", blocked="#F44747", decide="#DCDCAA", detail="#808080",
+        focus_bg="#37373D", focus_fg="#D4D4D4",
+        shimmer_edge="#808080", shimmer_mid="#569CD6", shimmer_peak="#DCEEFF",
+    ),
+}
+DEFAULT_THEME = "alvesmaia"
+
 SHIMMER_FPS = 15
+# This many characters glow at once, sweeping left-to-right over a running
+# item's text and looping. Widen this for a bigger glow; the gradient stays
+# smooth either way since it's generated, not hand-listed.
+SHIMMER_WIDTH = 15
 
 
-def shimmer_markup(text: str, frame: int) -> str:
+def _lerp_hex(start: str, end: str, t: float) -> str:
+    """Blend two `#rrggbb` colors, t=0 -> start, t=1 -> end."""
+    s = tuple(int(start[i : i + 2], 16) for i in (1, 3, 5))
+    e = tuple(int(end[i : i + 2], 16) for i in (1, 3, 5))
+    return "#" + "".join(f"{round(a + (b - a) * t):02X}" for a, b in zip(s, e))
+
+
+def _build_shimmer_colors(width: int, edge: str, mid: str, peak: str) -> tuple[str, ...]:
+    """A symmetric gradient, `width` characters wide: edge -> mid -> peak -> mid -> edge."""
+    half = (width - 1) / 2
+    colors = []
+    for i in range(width):
+        t = 1 - abs(i - half) / half
+        colors.append(
+            _lerp_hex(edge, mid, t * 2) if t <= 0.5 else _lerp_hex(mid, peak, (t - 0.5) * 2)
+        )
+    return tuple(colors)
+
+
+def shimmer_markup(text: str, frame: int, colors: tuple[str, ...], base: str) -> str:
     """`text` with a moving bright band, as Rich console markup.
 
     The band travels past both ends of the string before looping, so the
     glow visibly enters from the left and exits on the right rather than
     jumping back.
     """
-    period = len(text) + SHIMMER_WIDTH
-    center = (frame % period) - SHIMMER_WIDTH
+    width = len(colors)
+    period = len(text) + width
+    center = (frame % period) - width
     out: list[str] = []
     for i, ch in enumerate(text):
         offset = i - center
-        color = SHIMMER_COLORS[offset] if 0 <= offset < SHIMMER_WIDTH else SHIMMER_BASE
+        color = colors[offset] if 0 <= offset < width else base
         out.append(f"[bold {color}]{escape(ch)}[/]")
     return "".join(out)
+
+
+def parse_theme(argv: list[str]) -> tuple[str, list[str]]:
+    """Pull an optional `--theme NAME` / `--theme=NAME` out of argv.
+
+    Returns the theme name and argv with that flag removed, so the rest of
+    the script can keep treating argv[1] as the board path.
+    """
+    theme = DEFAULT_THEME
+    remaining = [argv[0]] if argv else []
+    i = 1
+    while i < len(argv):
+        arg = argv[i]
+        if arg == "--theme":
+            if i + 1 >= len(argv):
+                raise SystemExit("--theme needs a name")
+            theme = argv[i + 1]
+            i += 2
+        elif arg.startswith("--theme="):
+            theme = arg.split("=", 1)[1]
+            i += 1
+        else:
+            remaining.append(arg)
+            i += 1
+
+    if theme not in THEMES:
+        choices = ", ".join(sorted(THEMES))
+        raise SystemExit(f"unknown theme {theme!r}. Choices: {choices}")
+    return theme, remaining
 
 
 def find_board(argv: list[str]) -> Path:
@@ -230,21 +335,6 @@ def read_sections(path: Path) -> tuple[list[str], list[Section]]:
 
 
 class Board(App):
-    CSS = """
-    Screen { background: $surface; }
-    #title { padding: 0 2; text-style: bold; color: $primary; }
-    #summary { padding: 1 2 0 2; color: $text-muted; }
-    Collapsible { border: none; background: transparent; }
-    CollapsibleTitle { color: $text; text-style: bold; }
-    .item { padding: 0 0 0 2; }
-    .done { color: $text-muted; }
-    .running { color: $warning; text-style: bold; }
-    .todo { color: $text; }
-    .blocked { color: $error; }
-    .decide { color: $accent; }
-    .detail { padding: 0 0 1 4; color: $text-muted; }
-    """
-
     # priority=True is required on the arrows: the scrollable container binds
     # up/down for scrolling and swallows the key before it reaches the app —
     # without this, focus never leaves the first item.
@@ -262,7 +352,7 @@ class Board(App):
 
     mtime = reactive(0.0)
 
-    def __init__(self, board: Path) -> None:
+    def __init__(self, board: Path, theme: str = DEFAULT_THEME) -> None:
         super().__init__()
         self.board = board
         self.detail_file = find_detail_file(board)
@@ -271,6 +361,43 @@ class Board(App):
         # (widget, plain text) for whatever is currently "running" — rebuilt
         # on every reload(), animated independently by _tick_shimmer().
         self._shimmer_targets: list[tuple[Static | Collapsible, str]] = []
+
+        self.theme_colors = THEMES[theme]
+        self._shimmer_colors = _build_shimmer_colors(
+            SHIMMER_WIDTH, self.theme_colors.shimmer_edge, self.theme_colors.shimmer_mid, self.theme_colors.shimmer_peak
+        )
+        # Set per-instance rather than as a class-level CSS string, since the
+        # theme is only known once __init__ runs. Textual reads self.CSS (not
+        # the class attribute directly) when the app starts, so this is safe
+        # as long as only one Board runs per process — which is the only way
+        # this script is ever used.
+        self.CSS = self._build_css(self.theme_colors)
+
+    @staticmethod
+    def _build_css(t: ThemeColors) -> str:
+        background = t.background or "$surface"
+        return f"""
+        Screen {{ background: {background}; }}
+        #title {{ padding: 0 2; text-style: bold; color: {t.title}; }}
+        #summary {{ padding: 1 2 0 2; color: {t.summary}; }}
+        Collapsible {{ border: none; background: transparent; }}
+        CollapsibleTitle {{ color: {t.text}; text-style: bold; }}
+        .item {{ padding: 0 0 0 2; }}
+        .done {{ color: {t.done}; }}
+        .running {{ color: {t.running}; text-style: bold; }}
+        .todo {{ color: {t.todo}; }}
+        .blocked {{ color: {t.blocked}; }}
+        .decide {{ color: {t.decide}; }}
+        .detail {{ padding: 0 0 1 4; color: {t.detail}; }}
+
+        /* Textual's default focus style pulls a theme-blue cursor
+        background, which reads as same-hue-on-same-hue against a colorful
+        title/running/shimmer. A dark neutral reads as a plain selection. */
+        CollapsibleTitle:focus {{
+            background: {t.focus_bg};
+            color: {t.focus_fg};
+        }}
+        """
 
     def compose(self) -> ComposeResult:
         yield Label("", id="title")
@@ -297,7 +424,9 @@ class Board(App):
             return
         self._shimmer_frame += 1
         for widget, text in self._shimmer_targets:
-            markup = shimmer_markup(text, self._shimmer_frame)
+            markup = shimmer_markup(
+                text, self._shimmer_frame, self._shimmer_colors, self.theme_colors.shimmer_base
+            )
             if isinstance(widget, Collapsible):
                 widget.title = markup
             else:
@@ -478,4 +607,5 @@ if __name__ == "__main__":
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8")
 
-    Board(find_board(sys.argv)).run()
+    _theme, _argv = parse_theme(sys.argv)
+    Board(find_board(_argv), theme=_theme).run()

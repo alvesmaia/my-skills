@@ -116,6 +116,16 @@ the file does.
 
 At rest it only compares the file's modification time.
 
+## Themes
+
+`uv run <this-skill-dir>/scripts/claude-tasks.py --theme NAME [path]`
+
+- `alvesmaia` (default) — the alvesmaia brand palette (indigo accent, neutro
+  text), terminal's own background.
+- `dourado` — the same idea in amber/gold instead of indigo.
+- `monokai` — the classic Monokai editor palette, its own dark background.
+- `vscode-dark` — VS Code's Dark+ defaults, its own dark background.
+
 ## Requirements
 
 `uv` (https://docs.astral.sh/uv/). It resolves Python and Textual from the
