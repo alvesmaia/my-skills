@@ -28,11 +28,13 @@ Claude Code session:
 
 ```
 /plugin marketplace add alvesmaia/my-skills
-/plugin install my-skills@alvesmaia-skills
+/plugin install alvesmaia@alvesmaia-skills
 ```
 
 This installs every skill in `skills/` and keeps them updatable through the
-plugin system — no manual copying, no path to keep in sync by hand.
+plugin system — no manual copying, no path to keep in sync by hand. The
+plugin's name (`alvesmaia`) is also what prefixes any slash command it
+exposes, e.g. `/alvesmaia:<command>` instead of the repo's own name.
 
 ### Manually, one skill at a time
 
