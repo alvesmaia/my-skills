@@ -109,6 +109,11 @@ expanded — updating the board never collapses anything in their face. Mouse:
 click a title. Keyboard: `↑↓` moves, `→` opens or steps in, `←` closes or steps
 out, `Enter` toggles, `a` expands all, `c` collapses all, `q` quits.
 
+Whatever is `▶️` shimmers — a bright band sweeps across the task's text and,
+if the phase itself is in progress, across the phase title too. It's the only
+part of the board that changes on its own; everything else only updates when
+the file does.
+
 At rest it only compares the file's modification time.
 
 ## Requirements

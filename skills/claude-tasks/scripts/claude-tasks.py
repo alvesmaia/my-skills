@@ -28,6 +28,7 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from rich.markup import escape
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import VerticalScroll
@@ -76,6 +77,31 @@ CSS_CLASS = {
     "⛔": "blocked",
     "❓": "decide",
 }
+
+# A bright band, this many characters wide, sweeps left-to-right over a
+# running item's text and loops. SHIMMER_COLORS goes dim -> bright -> dim so
+# the band has a soft edge instead of a hard cutoff.
+SHIMMER_COLORS = ("#c9812f", "#e6a24a", "#f7c873", "#fff3d6", "#f7c873", "#e6a24a", "#c9812f")
+SHIMMER_BASE = "#c9812f"
+SHIMMER_WIDTH = len(SHIMMER_COLORS)
+SHIMMER_FPS = 15
+
+
+def shimmer_markup(text: str, frame: int) -> str:
+    """`text` with a moving bright band, as Rich console markup.
+
+    The band travels past both ends of the string before looping, so the
+    glow visibly enters from the left and exits on the right rather than
+    jumping back.
+    """
+    period = len(text) + SHIMMER_WIDTH
+    center = (frame % period) - SHIMMER_WIDTH
+    out: list[str] = []
+    for i, ch in enumerate(text):
+        offset = i - center
+        color = SHIMMER_COLORS[offset] if 0 <= offset < SHIMMER_WIDTH else SHIMMER_BASE
+        out.append(f"[bold {color}]{escape(ch)}[/]")
+    return "".join(out)
 
 
 def find_board(argv: list[str]) -> Path:
@@ -241,6 +267,10 @@ class Board(App):
         self.board = board
         self.detail_file = find_detail_file(board)
         self.details: dict[int, str] = {}
+        self._shimmer_frame = 0
+        # (widget, plain text) for whatever is currently "running" — rebuilt
+        # on every reload(), animated independently by _tick_shimmer().
+        self._shimmer_targets: list[tuple[Static | Collapsible, str]] = []
 
     def compose(self) -> ComposeResult:
         yield Label("", id="title")
@@ -260,6 +290,18 @@ class Board(App):
         # Watching by mtime keeps this dependency-free; a filesystem watcher
         # would be a library for one line of work.
         self.set_interval(1.0, self._check_file)
+        self.set_interval(1 / SHIMMER_FPS, self._tick_shimmer)
+
+    def _tick_shimmer(self) -> None:
+        if not self._shimmer_targets:
+            return
+        self._shimmer_frame += 1
+        for widget, text in self._shimmer_targets:
+            markup = shimmer_markup(text, self._shimmer_frame)
+            if isinstance(widget, Collapsible):
+                widget.title = markup
+            else:
+                widget.update(markup)
 
     def _check_file(self) -> None:
         try:
@@ -294,6 +336,10 @@ class Board(App):
         body = self.query_one("#body", VerticalScroll)
         body.remove_children()
 
+        # Rebuilt from scratch below; _tick_shimmer() only reads this list,
+        # so it's safe to replace in one shot once the loop below is done.
+        shimmer_targets: list[tuple[Static | Collapsible, str]] = []
+
         for section in sections:
             label = section.label()
             # A previous choice wins; on first load a finished phase starts
@@ -301,6 +347,7 @@ class Board(App):
             is_open = expanded.get(label, not section.complete)
 
             children: list[Static | Collapsible] = []
+            section_running = False
             for icon, text in section.items:
                 item_label = f"{icon}  {text}"
                 classes = f"item {CSS_CLASS[icon]}"
@@ -312,16 +359,19 @@ class Board(App):
                 # would open to show nothing, so it stays a plain line — the
                 # triangle appears only where there is something to read.
                 if detail:
-                    children.append(
-                        Collapsible(
-                            Static(detail, classes="detail"),
-                            title=item_label,
-                            collapsed=not expanded.get(item_label, False),
-                            classes=classes,
-                        )
+                    item_widget: Static | Collapsible = Collapsible(
+                        Static(detail, classes="detail"),
+                        title=item_label,
+                        collapsed=not expanded.get(item_label, False),
+                        classes=classes,
                     )
                 else:
-                    children.append(Static(item_label, classes=classes))
+                    item_widget = Static(item_label, classes=classes)
+                children.append(item_widget)
+
+                if icon == "▶️":
+                    section_running = True
+                    shimmer_targets.append((item_widget, item_label))
 
             if not children:
                 prose = "\n".join(section.prose).strip()
@@ -329,7 +379,15 @@ class Board(App):
                     continue
                 children = [Static(prose, classes="item")]
 
-            body.mount(Collapsible(*children, title=label, collapsed=not is_open))
+            phase_widget = Collapsible(*children, title=label, collapsed=not is_open)
+            # A phase currently doing something shimmers too, not just the
+            # task inside it — the board's job is to say "this is moving".
+            if section.is_phase and section_running:
+                shimmer_targets.append((phase_widget, label))
+            body.mount(phase_widget)
+
+        self._shimmer_targets = shimmer_targets
+        self._shimmer_frame = 0
 
     def _visible_titles(self) -> list[CollapsibleTitle]:
         """Titles the reader can actually see, in screen order.
